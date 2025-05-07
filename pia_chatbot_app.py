@@ -2,18 +2,18 @@ import streamlit as st
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
-# Load model safely on CPU for Streamlit Cloud
+# Load model
 device = "cpu"
 model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
 
 # Load your Excel file
 df = pd.read_excel('PIA Detailed Sections.xlsx')
 
-# Clean up column names — trims any accidental trailing/leading spaces
+# Clean up column names
 df.columns = df.columns.str.strip()
 
-# Debug: Show column names
-# st.write("Available columns:", df.columns.tolist())
+# Live diagnostic
+st.write("Live columns loaded:", df.columns.tolist())
 
 st.title("📑 PIA 2021 Section Finder Chatbot")
 
