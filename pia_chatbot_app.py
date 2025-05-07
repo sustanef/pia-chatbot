@@ -2,16 +2,16 @@ import streamlit as st
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
-# Load model safely — no device argument
+# Load model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Load your Excel file
-df = pd.read_excel('PIA Detailed Sections.xlsx')
+# Load Excel file with correct header row
+df = pd.read_excel('PIA Detailed Sections.xlsx', header=0)
 
 # Clean up column names
 df.columns = df.columns.str.strip()
 
-# Live diagnostic (remove later)
+# Diagnostic: Show column names
 st.write("Live columns loaded:", df.columns.tolist())
 
 st.title("📑 PIA 2021 Section Finder Chatbot")
