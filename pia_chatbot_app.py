@@ -6,13 +6,13 @@ from sentence_transformers import SentenceTransformer
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Load Excel file with header in second row (index 1)
-df = pd.read_excel('PIA Detailed Sections.xlsx', header=1)
+df = pd.read_excel('PIA Detailed Sections.xlsx', header=0)
 
 # Clean up column names
 df.columns = df.columns.str.strip()
 
 # Diagnostic: Show column names
-st.write("Live columns loaded:", df.columns.tolist())
+# st.write("Live columns loaded:", df.columns.tolist())
 
 st.title("📑 PIA 2021 Section Finder Chatbot")
 
