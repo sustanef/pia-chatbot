@@ -13,9 +13,12 @@ def load_summarizer():
 
 summarizer = load_summarizer()
 
-# Load Excel file with header on second row (index 1)
+# Load Excel file — replace header=1 with correct value after preview
 df = pd.read_excel('PIA Detailed Sections.xlsx', header=1)
 df.columns = df.columns.str.strip()
+
+# Optional: Confirm columns during testing
+# st.write("Live columns loaded:", df.columns.tolist())
 
 st.title("📑 PIA 2021 Section Finder Chatbot")
 
