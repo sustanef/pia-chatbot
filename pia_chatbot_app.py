@@ -1,18 +1,21 @@
 import streamlit as st
 import pandas as pd
 from sentence_transformers import SentenceTransformer
+from transformers import pipeline
 
 # Load model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Load Excel file with correct header row
-df = pd.read_excel('PIA Detailed Sections.xlsx', header=0)
+# Load summarizer
+@st.cache_resource
+def load_summarizer():
+    return pipeline("summarization", model="facebook/bart-large-cnn")
 
-# Clean up column names
+summarizer = load_summarizer()
+
+# Load Excel file with correct header
+df = pd.read_excel('PIA Detailed Sections.xlsx', header=1)
 df.columns = df.columns.str.strip()
-
-# Diagnostic: Show column names
-# st.write("Live columns loaded:", df.columns.tolist())
 
 st.title("📑 PIA 2021 Section Finder Chatbot")
 
@@ -28,6 +31,16 @@ if section_input:
             section_content = result_row.iloc[0]['Contents of Section']
             st.subheader(f"📌 {section_title} (Section {section_input})")
             st.write(section_content)
+
+            # Add summarizer button
+            if st.button("Summarize Section"):
+                if len(section_content.split()) < 50:
+                    st.info("Section is too short to summarize meaningfully.")
+                else:
+                    summary = summarizer(section_content, max_length=200, min_length=60, do_sample=False)
+                    st.subheader("🔍 Summary")
+                    st.write(summary[0]['summary_text'])
+
         else:
             st.error("❌ Section not found. Please check the number you entered.")
 
