@@ -12,7 +12,7 @@ df = pd.read_excel('PIA Detailed Sections.xlsx', header=0)
 df.columns = df.columns.str.strip()
 
 # Diagnostic: Show column names
-st.write("Live columns loaded:", df.columns.tolist())
+# st.write("Live columns loaded:", df.columns.tolist())
 
 st.title("📑 PIA 2021 Section Finder Chatbot")
 
