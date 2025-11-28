@@ -2,7 +2,7 @@ services:
   - type: web
     name: pia-chatbot
     env: python
-    plan: free
+    pythonVersion: 3.10
     buildCommand: pip install -r requirements.txt
     startCommand: streamlit run pia_chatbot_app.py --server.port=$PORT --server.address=0.0.0.0
-    autoDeploy: true
+    plan: free
