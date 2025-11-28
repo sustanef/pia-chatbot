@@ -1,129 +1,96 @@
 import streamlit as st
 import pandas as pd
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, util
 import numpy as np
-import re
 
-# -----------------------------
-# Load model (CPU only – Render friendly)
-# -----------------------------
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# ---------------------------
+# PAGE CONFIG
+# ---------------------------
+st.set_page_config(page_title="PIA Section Finder Chatbot", layout="wide")
 
-# -----------------------------
-# Load PIA Excel
-# -----------------------------
-df = pd.read_excel('PIA Detailed Sections.xlsx', header=0)
-df.columns = df.columns.str.strip()
+# ---------------------------
+# LOAD DATA (Cached)
+# ---------------------------
+@st.cache_data
+def load_pia_data():
+    df = pd.read_excel("PIA Detailed Sections.xlsx")
+    df.columns = df.columns.str.strip()
+    return df
 
-# Precompute embeddings for semantic search
-if "embeddings" not in st.session_state:
-    st.session_state.embeddings = model.encode(
-        df["Contents of Section"].fillna("").tolist(),
-        show_progress_bar=True
-    )
+df = load_pia_data()
 
-# -----------------------------
-# Helper: Keyword Highlight
-# -----------------------------
-def highlight_keywords(text, keyword):
-    pattern = re.compile(re.escape(keyword), re.IGNORECASE)
-    return pattern.sub(lambda m: f"**{m.group(0)}**", text)
+# ---------------------------
+# LOAD MODEL (Cached, CPU ONLY)
+# ---------------------------
+@st.cache_resource
+def load_model():
+    return SentenceTransformer("all-MiniLM-L6-v2")   # Perfect for Streamlit Cloud
 
-# -----------------------------
-# Streamlit UI
-# -----------------------------
-st.title("📘 PIA 2021 – Smart Legal Search Chatbot")
+model = load_model()
 
-search_mode = st.selectbox(
-    "Choose Search Mode",
-    ["Section Lookup", "Keyword Search", "Semantic Search", "Combined Search"]
-)
+# Precompute embeddings once for fast keyword search
+@st.cache_resource
+def compute_embeddings(texts):
+    return model.encode(texts, convert_to_tensor=True)
 
-user_input = st.text_input("🔍 Enter Search Query (e.g., 311, gas pricing, transition, host community…)")
+embeddings = compute_embeddings(df["Contents of Section"].fillna("").tolist())
 
-if user_input:
+# ---------------------------
+# UI LAYOUT
+# ---------------------------
+st.title("📘 PIA 2021 – Section Finder & Chatbot")
 
-    # ---------------------------------
-    # SECTION LOOKUP
-    # ---------------------------------
-    if search_mode == "Section Lookup":
-        try:
-            result = df.loc[df["Section Numbers"].astype(str) == user_input.strip()]
+tab1, tab2 = st.tabs(["🔎 Search by Section Number", "🧠 Ask a Question / Keyword Search"])
+
+# ===========================
+# TAB 1 — SECTION LOOKUP
+# ===========================
+with tab1:
+
+    st.subheader("🔎 Look up a PIA Section")
+    section_input = st.text_input("Enter a Section Number (e.g., 311)", "")
+
+    if st.button("Search Section"):
+        if section_input.strip():
+
+            # Filter exact section number
+            result = df[df["Section Numbers"].astype(str) == section_input.strip()]
 
             if not result.empty:
                 row = result.iloc[0]
-                st.subheader(f"📌 {row['Title of Section']} (Section {row['Section Numbers']})")
+
+                st.success(f"Section {section_input} found ✔️")
+                st.subheader(f"📌 {row['Title of Section']}")
                 st.write(row["Contents of Section"])
+
             else:
-                st.error("❌ Section not found.")
-        except Exception as e:
-            st.error(f"⚠️ {e}")
+                st.error("❌ Section not found. Please check the number.")
 
-    # ---------------------------------
-    # KEYWORD SEARCH
-    # ---------------------------------
-    elif search_mode == "Keyword Search":
-        keyword = user_input.strip()
-        hits = df[df["Contents of Section"].str.contains(keyword, case=False, na=False)]
+# ===========================
+# TAB 2 — QUESTION / KEYWORD SEARCH
+# ===========================
+with tab2:
 
-        if hits.empty:
-            st.warning("No exact keyword matches found.")
-        else:
-            for _, row in hits.iterrows():
-                st.markdown(f"### 📌 Section {row['Section Numbers']} — {row['Title of Section']}")
-                highlighted = highlight_keywords(row["Contents of Section"], keyword)
-                st.markdown(highlighted)
+    st.subheader("🧠 Ask any question about the PIA or search with keywords")
+    user_query = st.text_input("Enter your question or keyword(s)")
 
-    # ---------------------------------
-    # SEMANTIC SEARCH
-    # ---------------------------------
-    elif search_mode == "Semantic Search":
-        query_embedding = model.encode([user_input])[0]
-        all_embeddings = np.array(st.session_state.embeddings)
+    if st.button("Search Content"):
+        if user_query.strip():
 
-        # Compute cosine similarity
-        similarity_scores = np.dot(all_embeddings, query_embedding) / (
-            np.linalg.norm(all_embeddings, axis=1) * np.linalg.norm(query_embedding)
-        )
+            # Encode query
+            query_embedding = model.encode(user_query, convert_to_tensor=True)
 
-        top_n = 5
-        top_indices = np.argsort(similarity_scores)[-top_n:][::-1]
+            # Compute semantic similarity
+            scores = util.cos_sim(query_embedding, embeddings)[0]
 
-        st.subheader("🔎 Top Relevant Sections")
+            # Get best match
+            best_idx = int(np.argmax(scores))
+            best_row = df.iloc[best_idx]
 
-        for idx in top_indices:
-            row = df.iloc[idx]
-            st.markdown(f"### 📌 {row['Title of Section']} (Section {row['Section Numbers']})")
-            st.write(row["Contents of Section"])
+            st.success("Best matching section found ✔️")
 
-    # ---------------------------------
-    # COMBINED SEARCH (Keyword + Semantic)
-    # ---------------------------------
-    elif search_mode == "Combined Search":
-        keyword = user_input.strip()
+            st.subheader(f"📌 {best_row['Title of Section']} (Section {best_row['Section Numbers']})")
+            st.write(best_row["Contents of Section"])
 
-        # Keyword hits
-        keyword_hits = df[df["Contents of Section"].str.contains(keyword, case=False, na=False)]
+            st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
 
-        # Semantic hits
-        query_embedding = model.encode([user_input])[0]
-        all_embeddings = np.array(st.session_state.embeddings)
-        similarity_scores = np.dot(all_embeddings, query_embedding) / (
-            np.linalg.norm(all_embeddings, axis=1) * np.linalg.norm(query_embedding)
-        )
-        top_indices = np.argsort(similarity_scores)[-5:][::-1]
-
-        st.subheader("🔎 Keyword Matches (if any)")
-        if keyword_hits.empty:
-            st.write("No keyword matches.")
-        else:
-            for _, row in keyword_hits.iterrows():
-                st.markdown(f"### 📌 {row['Title of Section']} (Section {row['Section Numbers']})")
-                highlighted = highlight_keywords(row["Contents of Section"], keyword)
-                st.markdown(highlighted)
-
-        st.subheader("🔎 Top Semantic Matches")
-        for idx in top_indices:
-            row = df.iloc[idx]
-            st.markdown(f"### 📌 {row['Title of Section']} (Section {row['Section Numbers']})")
-            st.write(row["Contents of Section"])
