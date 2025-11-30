@@ -16,7 +16,7 @@ col1, col2 = st.columns([1, 6])
 
 with col1:
     try:
-        logo = Image.open("NMDPRA_logo.png")  # Make sure this file exists
+        logo = Image.open("NMDPRA_logo.png")
         st.image(logo, width=110)
     except:
         st.warning("NMDPRA Logo not found.")
@@ -24,7 +24,7 @@ with col1:
 with col2:
     st.markdown("""
         <h1 style="margin-bottom: -10px;">PIA 2021 – Section Finder & Intelligent Chatbot</h1>
-        <h4 style="color:#444;">Developed by <b>Abubakar Sani Hassan,PhD,SMIEEE,MIET.</b>, NMDPRA</h4>
+        <h4 style="color:#444;">Developed by <b>Abubakar Sani Hassan</b>,PhD,SMIEEE,MIET.</h4>
     """, unsafe_allow_html=True)
 
 st.markdown("---")
@@ -41,7 +41,7 @@ def load_pia_data():
 df = load_pia_data()
 
 # -----------------------------------------------------
-# LOAD MODEL (Cached for performance)
+# LOAD MODEL
 # -----------------------------------------------------
 @st.cache_resource
 def load_model():
@@ -50,7 +50,7 @@ def load_model():
 model = load_model()
 
 # -----------------------------------------------------
-# PRECOMPUTE EMBEDDINGS (for keyword search)
+# PRECOMPUTE EMBEDDINGS
 # -----------------------------------------------------
 @st.cache_resource
 def compute_embeddings(texts):
@@ -59,11 +59,8 @@ def compute_embeddings(texts):
 embeddings = compute_embeddings(df["Contents of Section"].fillna("").tolist())
 
 # -----------------------------------------------------
-# SESSION STATE SAFE TABS
+# TABS
 # -----------------------------------------------------
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = "section"
-
 tab_section, tab_query = st.tabs([
     "🔎 Search by Section Number",
     "🧠 Ask a Question / Keyword Search"
@@ -73,74 +70,55 @@ tab_section, tab_query = st.tabs([
 # TAB 1 — SECTION LOOKUP
 # =====================================================
 with tab_section:
-    if st.session_state.active_tab == "section":
 
-        st.subheader("🔎 Look up a PIA Section")
+    st.subheader("🔎 Look up a PIA Section")
 
-        section_input = st.text_input(
-            "Enter a Section Number (e.g., 311)",
-            key="section_input_box"
-        )
+    section_input = st.text_input(
+        "Enter a Section Number (e.g., 311)",
+        key="section_input"
+    )
 
-        if st.button("Search Section", key="btn_section"):
-            st.session_state.active_tab = "section"
+    if st.button("Search Section"):
+        if section_input.strip():
 
-            if section_input.strip():
-                result = df[df["Section Numbers"].astype(str).str.strip() == section_input.strip()]
+            result = df[df["Section Numbers"].astype(str).str.strip() == section_input.strip()]
 
-                if not result.empty:
-                    row = result.iloc[0]
+            if not result.empty:
+                row = result.iloc[0]
 
-                    st.success(f"Section {section_input} found ✔️")
-                    st.subheader(f"📌 {row['Title of Section']}")
-                    st.write(row["Contents of Section"])
-                else:
-                    st.error("❌ Section not found. Please check the number.")
-
+                st.success(f"Section {section_input} found ✔️")
+                st.subheader(f"📌 {row['Title of Section']}")
+                st.write(row["Contents of Section"])
+            else:
+                st.error("❌ Section not found. Please check the number.")
 
 # =====================================================
 # TAB 2 — QUESTION / KEYWORD SEARCH
 # =====================================================
 with tab_query:
-    if st.session_state.active_tab == "query":
 
-        st.subheader("🧠 Ask any question about the PIA or search with keywords")
+    st.subheader("🧠 Ask any question about the PIA or search with keywords")
 
-        user_query = st.text_input(
-            "Enter your question or keyword(s)",
-            key="query_input_box"
-        )
+    user_query = st.text_input(
+        "Enter your question or keyword(s)",
+        key="keyword_query"
+    )
 
-        if st.button("Search Content", key="btn_query"):
-            st.session_state.active_tab = "query"
+    if st.button("Search Content"):
+        if user_query.strip():
 
-            if user_query.strip():
-                query_emb = model.encode(user_query, convert_to_tensor=True)
+            query_emb = model.encode(user_query, convert_to_tensor=True)
 
-                scores = util.cos_sim(query_emb, embeddings)[0]
+            scores = util.cos_sim(query_emb, embeddings)[0]
+            best_idx = int(np.argmax(scores))
+            best_row = df.iloc[best_idx]
 
-                best_idx = int(np.argmax(scores))
+            st.success("Best matching section found ✔️")
 
-                best_row = df.iloc[best_idx]
+            st.subheader(
+                f"📌 {best_row['Title of Section']} "
+                f"(Section {best_row['Section Numbers']})"
+            )
+            st.write(best_row["Contents of Section"])
 
-                st.success("Best matching section found ✔️")
-
-                st.subheader(
-                    f"📌 {best_row['Title of Section']} "
-                    f"(Section {best_row['Section Numbers']})"
-                )
-                st.write(best_row["Contents of Section"])
-
-                st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
-
-# -----------------------------------------------------
-# TAB SWITCHING LOGIC
-# -----------------------------------------------------
-# To prevent tab jumping after clicking buttons:
-# We explicitly set which tab should remain active.
-
-if st.session_state.get("btn_section"):
-    st.session_state.active_tab = "section"
-
-if st.session_state.get("btn_query"):
-    st.session_state.active_tab = "query"
+            st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
