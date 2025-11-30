@@ -2,31 +2,36 @@ import streamlit as st
 import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
+from PIL import Image
 
-# ---------------------------
+# -----------------------------------------------------
 # PAGE CONFIG
-# ---------------------------
+# -----------------------------------------------------
 st.set_page_config(page_title="PIA Section Finder Chatbot", layout="wide")
 
-# ---------------------------
-# CUSTOM HEADER (LOGO + TITLE + NAME)
-# ---------------------------
-st.markdown(
-    """
-    <div style="text-align: center; margin-bottom: 20px;">
-        <img src="https://raw.githubusercontent.com/sustanef/pia-chatbot/main/NMDPRA_logo.png"
-             alt="NMDPRA Logo" width="130">
-        <h1 style="margin-top: 10px;">📘 PIA 2021 – Section Finder & Chatbot</h1>
-        <h3 style="color: #555;">By Abubakar Sani Hassan, PhD, SMIEEE, MIET</h3>
-        <hr>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# -----------------------------------------------------
+# HEADER WITH LOGO
+# -----------------------------------------------------
+col1, col2 = st.columns([1, 6])
 
-# ---------------------------
-# LOAD DATA (Cached)
-# ---------------------------
+with col1:
+    try:
+        logo = Image.open("NMDPRA_logo.png")  # Make sure this file exists
+        st.image(logo, width=110)
+    except:
+        st.warning("NMDPRA Logo not found.")
+
+with col2:
+    st.markdown("""
+        <h1 style="margin-bottom: -10px;">PIA 2021 – Section Finder & Intelligent Chatbot</h1>
+        <h4 style="color:#444;">Developed by <b>Abubakar Sani Hassan,PhD,SMIEEE,MIET.</b>, NMDPRA</h4>
+    """, unsafe_allow_html=True)
+
+st.markdown("---")
+
+# -----------------------------------------------------
+# LOAD DATA
+# -----------------------------------------------------
 @st.cache_data
 def load_pia_data():
     df = pd.read_excel("PIA Detailed Sections.xlsx")
@@ -35,71 +40,107 @@ def load_pia_data():
 
 df = load_pia_data()
 
-# ---------------------------
-# LOAD MODEL (Cached, CPU ONLY)
-# ---------------------------
+# -----------------------------------------------------
+# LOAD MODEL (Cached for performance)
+# -----------------------------------------------------
 @st.cache_resource
 def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")   # Efficient for Streamlit hosting
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 model = load_model()
 
-# Precompute embeddings once for fast keyword search
+# -----------------------------------------------------
+# PRECOMPUTE EMBEDDINGS (for keyword search)
+# -----------------------------------------------------
 @st.cache_resource
 def compute_embeddings(texts):
     return model.encode(texts, convert_to_tensor=True)
 
 embeddings = compute_embeddings(df["Contents of Section"].fillna("").tolist())
 
-# ---------------------------
-# UI TABS
-# ---------------------------
-tab1, tab2 = st.tabs(["🔎 Search by Section Number", "🧠 Ask a Question / Keyword Search"])
+# -----------------------------------------------------
+# SESSION STATE SAFE TABS
+# -----------------------------------------------------
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "section"
 
-# ===========================
+tab_section, tab_query = st.tabs([
+    "🔎 Search by Section Number",
+    "🧠 Ask a Question / Keyword Search"
+])
+
+# =====================================================
 # TAB 1 — SECTION LOOKUP
-# ===========================
-with tab1:
+# =====================================================
+with tab_section:
+    if st.session_state.active_tab == "section":
 
-    st.subheader("🔎 Look up a PIA Section")
-    section_input = st.text_input("Enter a Section Number (e.g., 311)", "")
+        st.subheader("🔎 Look up a PIA Section")
 
-    if st.button("Search Section"):
-        if section_input.strip():
+        section_input = st.text_input(
+            "Enter a Section Number (e.g., 311)",
+            key="section_input_box"
+        )
 
-            result = df[df["Section Numbers"].astype(str) == section_input.strip()]
+        if st.button("Search Section", key="btn_section"):
+            st.session_state.active_tab = "section"
 
-            if not result.empty:
-                row = result.iloc[0]
+            if section_input.strip():
+                result = df[df["Section Numbers"].astype(str).str.strip() == section_input.strip()]
 
-                st.success(f"Section {section_input} found ✔️")
-                st.subheader(f"📌 {row['Title of Section']}")
-                st.write(row["Contents of Section"])
+                if not result.empty:
+                    row = result.iloc[0]
 
-            else:
-                st.error("❌ Section not found. Please check the number.")
+                    st.success(f"Section {section_input} found ✔️")
+                    st.subheader(f"📌 {row['Title of Section']}")
+                    st.write(row["Contents of Section"])
+                else:
+                    st.error("❌ Section not found. Please check the number.")
 
-# ===========================
+
+# =====================================================
 # TAB 2 — QUESTION / KEYWORD SEARCH
-# ===========================
-with tab2:
+# =====================================================
+with tab_query:
+    if st.session_state.active_tab == "query":
 
-    st.subheader("🧠 Ask any question about the PIA or search with keywords")
-    user_query = st.text_input("Enter your question or keyword(s)")
+        st.subheader("🧠 Ask any question about the PIA or search with keywords")
 
-    if st.button("Search Content"):
-        if user_query.strip():
+        user_query = st.text_input(
+            "Enter your question or keyword(s)",
+            key="query_input_box"
+        )
 
-            query_embedding = model.encode(user_query, convert_to_tensor=True)
-            scores = util.cos_sim(query_embedding, embeddings)[0]
+        if st.button("Search Content", key="btn_query"):
+            st.session_state.active_tab = "query"
 
-            best_idx = int(np.argmax(scores))
-            best_row = df.iloc[best_idx]
+            if user_query.strip():
+                query_emb = model.encode(user_query, convert_to_tensor=True)
 
-            st.success("Best matching section found ✔️")
+                scores = util.cos_sim(query_emb, embeddings)[0]
 
-            st.subheader(f"📌 {best_row['Title of Section']} (Section {best_row['Section Numbers']})")
-            st.write(best_row["Contents of Section"])
+                best_idx = int(np.argmax(scores))
 
-            st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
+                best_row = df.iloc[best_idx]
 
+                st.success("Best matching section found ✔️")
+
+                st.subheader(
+                    f"📌 {best_row['Title of Section']} "
+                    f"(Section {best_row['Section Numbers']})"
+                )
+                st.write(best_row["Contents of Section"])
+
+                st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
+
+# -----------------------------------------------------
+# TAB SWITCHING LOGIC
+# -----------------------------------------------------
+# To prevent tab jumping after clicking buttons:
+# We explicitly set which tab should remain active.
+
+if st.session_state.get("btn_section"):
+    st.session_state.active_tab = "section"
+
+if st.session_state.get("btn_query"):
+    st.session_state.active_tab = "query"
