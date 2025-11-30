@@ -9,6 +9,22 @@ import numpy as np
 st.set_page_config(page_title="PIA Section Finder Chatbot", layout="wide")
 
 # ---------------------------
+# CUSTOM HEADER (LOGO + TITLE + NAME)
+# ---------------------------
+st.markdown(
+    """
+    <div style="text-align: center; margin-bottom: 20px;">
+        <img src="https://raw.githubusercontent.com/sustanef/pia-chatbot/main/NMDPRA_logo.png"
+             alt="NMDPRA Logo" width="130">
+        <h1 style="margin-top: 10px;">📘 PIA 2021 – Section Finder & Chatbot</h1>
+        <h3 style="color: #555;">By Abubakar Sani Hassan</h3>
+        <hr>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------------------------
 # LOAD DATA (Cached)
 # ---------------------------
 @st.cache_data
@@ -24,7 +40,7 @@ df = load_pia_data()
 # ---------------------------
 @st.cache_resource
 def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")   # Perfect for Streamlit Cloud
+    return SentenceTransformer("all-MiniLM-L6-v2")   # Efficient for Streamlit hosting
 
 model = load_model()
 
@@ -36,10 +52,8 @@ def compute_embeddings(texts):
 embeddings = compute_embeddings(df["Contents of Section"].fillna("").tolist())
 
 # ---------------------------
-# UI LAYOUT
+# UI TABS
 # ---------------------------
-st.title("📘 PIA 2021 – Section Finder & Chatbot")
-
 tab1, tab2 = st.tabs(["🔎 Search by Section Number", "🧠 Ask a Question / Keyword Search"])
 
 # ===========================
@@ -53,7 +67,6 @@ with tab1:
     if st.button("Search Section"):
         if section_input.strip():
 
-            # Filter exact section number
             result = df[df["Section Numbers"].astype(str) == section_input.strip()]
 
             if not result.empty:
@@ -77,13 +90,9 @@ with tab2:
     if st.button("Search Content"):
         if user_query.strip():
 
-            # Encode query
             query_embedding = model.encode(user_query, convert_to_tensor=True)
-
-            # Compute semantic similarity
             scores = util.cos_sim(query_embedding, embeddings)[0]
 
-            # Get best match
             best_idx = int(np.argmax(scores))
             best_row = df.iloc[best_idx]
 
@@ -93,4 +102,3 @@ with tab2:
             st.write(best_row["Contents of Section"])
 
             st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
-
