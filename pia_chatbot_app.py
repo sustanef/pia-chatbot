@@ -17,7 +17,7 @@ st.markdown(
         <img src="https://raw.githubusercontent.com/sustanef/pia-chatbot/main/NMDPRA_logo.png"
              alt="NMDPRA Logo" width="130">
         <h1 style="margin-top: 10px;">📘 PIA 2021 – Section Finder & Chatbot</h1>
-        <h3 style="color: #555;">By Abubakar Sani Hassan</h3>
+        <h3 style="color: #555;">By Abubakar Sani Hassan, PhD, SMIEEE, MIET</h3>
         <hr>
     </div>
     """,
@@ -102,3 +102,4 @@ with tab2:
             st.write(best_row["Contents of Section"])
 
             st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
+
