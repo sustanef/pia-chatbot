@@ -23,7 +23,7 @@ with col1:
 
 with col2:
     st.markdown("""
-        <h1 style="margin-bottom: -10px;">PIA 2021 – Section Finder & Intelligent Chatbot</h1>
+        <h1 style="margin-bottom: -10px;">PIA 2021 – Section Finder and Chat</h1>
         <h4 style="color:#444;">Developed by <b>Abubakar Sani Hassan</b>,PhD,SMIEEE,MIET.</h4>
     """, unsafe_allow_html=True)
 
@@ -122,3 +122,4 @@ with tab_query:
             st.write(best_row["Contents of Section"])
 
             st.caption(f"Similarity Score: {float(scores[best_idx]):.4f}")
+
